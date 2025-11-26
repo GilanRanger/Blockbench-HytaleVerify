@@ -39,7 +39,7 @@
   });
 
   function verifyHytaleModel() {
-    verifyModel(32, 'Model');
+    verifyModel(16, 'Model');
   }
 
   function isMeshCuboid(mesh) {
@@ -305,14 +305,10 @@
             let textureUVWidth = texture.uv_width || texture.width || 16;
             let textureUVHeight = texture.uv_height || texture.height || 16;
             
-            let uvScaleX = (texture.width || 128) / textureUVWidth;
-            let uvScaleY = (texture.height || 128) / textureUVHeight;
-            
-            let actualPixelsWidth = uvWidth * uvScaleX;
-            let actualPixelsHeight = uvHeight * uvScaleY;
-            
+            let actualPixelsWidth = uvWidth;
+            let actualPixelsHeight = uvHeight;
+
             let faceSize = getFaceSize(cube, faceKey);
-            
             let pixelsNeededWidth = (faceSize.width / 16) * expectedDensity;
             let pixelsNeededHeight = (faceSize.height / 16) * expectedDensity;
             
@@ -327,79 +323,6 @@
         }
       }
     });
-    
-    if (Mesh.all) {
-      Mesh.all.forEach(mesh => {
-        if (!mesh.visibility) return;
-        
-        if (mesh.faces) {
-          for (let faceKey in mesh.faces) {
-            let face = mesh.faces[faceKey];
-            
-            if (face.vertices && face.vertices.length > 0 && face.texture && face.uv) {
-              let texture = Texture.all.find(t => t.uuid === face.texture);
-              if (texture) {
-                let faceVertices = face.vertices.map(vKey => mesh.vertices[vKey]);
-                
-                let xRange = Math.max(...faceVertices.map(v => v[0])) - Math.min(...faceVertices.map(v => v[0]));
-                let yRange = Math.max(...faceVertices.map(v => v[1])) - Math.min(...faceVertices.map(v => v[1]));
-                let zRange = Math.max(...faceVertices.map(v => v[2])) - Math.min(...faceVertices.map(v => v[2]));
-                
-                let worldDimensions = [xRange, yRange, zRange].filter(d => d > 0.01).sort((a,b) => b - a);
-                
-                let uvCoords = face.vertices.map(vKey => face.uv[vKey]);
-                
-                if (uvCoords.length > 0 && uvCoords[0]) {
-                  let uRange = Math.max(...uvCoords.map(uv => uv[0])) - Math.min(...uvCoords.map(uv => uv[0]));
-                  let vRange = Math.max(...uvCoords.map(uv => uv[1])) - Math.min(...uvCoords.map(uv => uv[1]));
-                  
-                  let uvDimensions = [uRange, vRange].sort((a,b) => b - a);
-                  
-                  let textureUVWidth = texture.uv_width || texture.width || 16;
-                  let textureUVHeight = texture.uv_height || texture.height || 16;
-                  
-                  let uvScaleX = (texture.width || 128) / textureUVWidth;
-                  let uvScaleY = (texture.height || 128) / textureUVHeight;
-                  
-                  let actualPixels = [
-                    uvDimensions[0] * uvScaleX,
-                    uvDimensions[1] * uvScaleY
-                  ].sort((a,b) => b - a);
-                  
-                  let pixelsNeeded = [
-                    (worldDimensions[0] / 16) * expectedDensity,
-                    (worldDimensions[1] / 16) * expectedDensity
-                  ].sort((a,b) => b - a);
-                  
-                  if (Math.abs(actualPixels[0] - pixelsNeeded[0]) > 1 || Math.abs(actualPixels[1] - pixelsNeeded[1]) > 1) {
-                    if (!meshIssues[mesh.name]) {
-                      meshIssues[mesh.name] = {
-                        count: 0,
-                        example: {
-                          resolution: `${actualPixels[0].toFixed(1)}x${actualPixels[1].toFixed(1)} pixels (need ${pixelsNeeded[0].toFixed(1)}x${pixelsNeeded[1].toFixed(1)})`,
-                          expected: `${expectedDensity}px density`
-                        }
-                      };
-                    }
-                    meshIssues[mesh.name].count++;
-                  }
-                }
-              }
-            }
-          }
-        }
-      });
-    }
-    
-    for (let meshName in meshIssues) {
-      let meshIssue = meshIssues[meshName];
-      let additionalText = meshIssue.count > 1 ? ` (+${meshIssue.count - 1} other face${meshIssue.count > 2 ? 's' : ''})` : '';
-      issues.push({
-        name: `${meshName}${additionalText}`,
-        resolution: meshIssue.example.resolution,
-        expected: meshIssue.example.expected
-      });
-    }
     
     if (issues.length === 0) {
       Blockbench.showQuickMessage(`${modelType} verified! All textures are correct density.`, 3000);
