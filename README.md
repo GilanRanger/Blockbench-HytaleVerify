@@ -13,3 +13,9 @@ To add the Verification tools to your tool bar. Go to the 3 dots that say "Toolb
 ### Tools
 
 The plugin comes with a "Verify Hytale Entity/Item" and "Verify Hytale Block" tool. This is because entities are meant to have a 64x resolution while blocks are intended to have a 32x resolution. When the verify tools are used, the plugin will check whether you only used Planes and Cuboids, and will check the resolution for all used textures. The warning screen will tell you which objects are problematic.
+
+The plugin also includes a "Convert Meshes To Cubes" which will convert any cuboids or planes into Cubes (which are defined differently)
+
+### Issues
+
+If you run into any issues, please report them.
