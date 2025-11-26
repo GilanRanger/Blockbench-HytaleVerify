@@ -16,6 +16,8 @@ The plugin comes with a "Verify Hytale Model" tool. When the verify tools are us
 
 The plugin also includes a "Convert Meshes To Cubes" which will convert any cuboids or planes into Cubes (Meshes will not be supported by the Hytale engine)
 
+There is also a "Fix UV for Hytale Model" which will scale your UV to be the right size. Sometimes the model may be correct, but the UV values are decimals instead of integers; this will fix that.
+
 ### Issues
 
 If you run into any issues, please report them.
