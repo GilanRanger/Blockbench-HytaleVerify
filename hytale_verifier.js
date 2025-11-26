@@ -5,25 +5,16 @@
     author: 'Gilan',
     description: 'Verifies whether a model has the correct resolution for the Hytale art-style',
     icon: 'verified',
-    version: '1.1.0',
+    version: '1.2.0',
     variant: 'both',
     
     onload() {
-      let entityItemVerify = new Action('hytale_entity_verify', {
-        name: 'Verify Hytale Entity/Item',
-        description: 'Click to verify if your Entity/Item Model has the correct texture resolution',
-        icon: 'person',
-        click() {
-          verifyHytaleEntityAndItem();
-        }
-      });
-
-      let blockVerify = new Action('hytale_block_verify', {
-        name: 'Verify Hytale Block',
-        description: 'Click to verify if your Block Model has the correct texture resolution',
+      let modelVerify = new Action('hytale_model_verify', {
+        name: 'Verify Hytale Model',
+        description: 'Click to verify if your Model has the correct texture resolution (1 pixel = 1 world unit)',
         icon: 'view_in_ar',
         click() {
-          verifyHytaleBlock();
+          verifyHytaleModel();
         }
       });
 
@@ -36,8 +27,7 @@
         }
       });
       
-      MenuBar.addAction(entityItemVerify, 'tools');
-      MenuBar.addAction(blockVerify, 'tools');
+      MenuBar.addAction(modelVerify, 'tools');
       MenuBar.addAction(meshToCube, 'tools');
     },
     
@@ -48,12 +38,8 @@
     }
   });
 
-  function verifyHytaleEntityAndItem() {
-    verifyModel(64, 'Entity/Item');
-  }
-
-  function verifyHytaleBlock() {
-    verifyModel(32, 'Block');
+  function verifyHytaleModel() {
+    verifyModel(32, 'Model');
   }
 
   function isMeshCuboid(mesh) {
@@ -112,7 +98,9 @@
       return;
     }
     
-    Undo.initEdit({elements: meshesToConvert});
+    Undo.initEdit({elements: meshesToConvert, outliner: true});
+    
+    let createdCubes = [];
     
     meshesToConvert.forEach(mesh => {
       try {
@@ -166,14 +154,16 @@
           cube.addTo(parent);
         }
         
+        createdCubes.push(cube);
         mesh.remove();
         converted++;
       } catch (e) {
+        console.error('Error converting mesh:', e);
         skipped++;
       }
     });
     
-    Undo.finishEdit('Convert meshes to cubes');
+    Undo.finishEdit('Convert meshes to cubes', {elements: createdCubes, outliner: true});
     
     Canvas.updateAll();
     updateSelection();
@@ -330,7 +320,7 @@
               issues.push({
                 name: `${cube.name} (${faceKey} face)`,
                 resolution: `${actualPixelsWidth.toFixed(1)}x${actualPixelsHeight.toFixed(1)} pixels (need ${pixelsNeededWidth.toFixed(1)}x${pixelsNeededHeight.toFixed(1)})`,
-                expected: `${expectedDensity}px density`
+                expected: `1:1 pixel density`
               });
             }
           }
@@ -412,13 +402,13 @@
     }
     
     if (issues.length === 0) {
-      Blockbench.showQuickMessage(`${modelType} model verified! All textures are ${expectedDensity}px density.`, 3000);
+      Blockbench.showQuickMessage(`${modelType} verified! All textures are correct density.`, 3000);
     } else {
       const maxDisplay = 8;
       let displayIssues = issues.slice(0, maxDisplay);
       let remainingCount = issues.length - maxDisplay;
       
-      let message = `Found ${issues.length} issue(s) with ${modelType} model (expected ${expectedDensity}px density):\n\n`;
+      let message = `Found ${issues.length} issue(s) with ${modelType} model (expected 1:1 pixel density):\n\n`;
       displayIssues.forEach(issue => {
         message += ` - ${issue.name}: ${issue.resolution} (Expected: ${issue.expected})\n`;
       });
