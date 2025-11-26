@@ -18,6 +18,15 @@
         }
       });
 
+      let uvScale = new Action('hytale_fix_uv_scale', {
+        name: 'Fix UV for Hytale Model',
+        description: 'Scales UV coordiantes to match the size of their texture',
+        icon: 'photo_size_select_large',
+        click() {
+          fixUVScale();
+        }
+      });
+
       let meshToCube = new Action('hytale_mesh_to_cube', {
         name: 'Convert Meshes to Cubes',
         description: 'Converts cuboid meshes to cubes while preserving UVs and properties',
@@ -27,13 +36,14 @@
         }
       });
       
+      MenuBar.addAction(uvScale, 'tools');
       MenuBar.addAction(modelVerify, 'tools');
       MenuBar.addAction(meshToCube, 'tools');
     },
     
     onunload() {
-      entityItemVerify.delete();
-      blockVerify.delete();
+      uvScale.delete();
+      modelVerify.delete();
       meshToCube.delete();
     }
   });
@@ -346,6 +356,64 @@
         icon: 'warning'
       });
     }
+  }
+
+  function fixUVScale() {
+    // Track what the largest texture is
+    let maxWidth = 0;
+    let maxHeight = 0;
+
+    Texture.all.forEach(texture => {
+      maxWidth = Math.max(maxWidth, texture.width);
+      maxHeight = Math.max(maxHeight, texture.height);
+    });
+
+    const projectUVWidth = Project.texture_width || 16
+    const projectUVHeight = Project.texture_height || 16
+
+    // Start of undo point
+    Undo.initEdit({
+      cubes: Cube.all,
+      textures: Texture.all,
+      uv_mode: true
+    });
+
+    // Scale UVs for each texture
+    Texture.all.forEach(texture => {
+      const scaleX = texture.width / projectUVWidth;
+      const scaleY = texture.height / projectUVHeight;
+
+      Cube.all.forEach(cube => {
+        for (let faceKey in cube.faces) {
+          let face = cube.faces[faceKey];
+
+          if(face.texture === texture.uuid) {
+            if(face.uv) {
+              face.uv[0] *= scaleX;
+              face.uv[1] *= scaleY;
+              face.uv[2] *= scaleX;
+              face.uv[3] *= scaleY;
+            }
+          }
+        }
+      });
+
+      texture.uv_width = texture.width;
+      texture.uv_height = texture.height;
+    });
+
+    Project.texture_width = maxWidth;
+    Project.texture_height = maxHeight;
+
+    // End of undo point
+    Undo.finishEdit('Rescale UVs to texture size', {
+      cubes: Cube.all,
+      textures: Texture.all,
+      uv_mode: true,
+    });
+
+    Canvas.updateAll();
+    Blockbench.showQuickMessage(`UVs rescaled! Project UV size set to ${maxWidth}x${maxHeight}`);
   }
   
   function getFaceSize(cube, faceKey) {
