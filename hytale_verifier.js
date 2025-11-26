@@ -5,7 +5,7 @@
     author: 'Gilan',
     description: 'Verifies whether a model has the correct resolution for the Hytale art-style',
     icon: 'verified',
-    version: '1.0.0',
+    version: '1.1.0',
     variant: 'both',
     
     onload() {
@@ -26,14 +26,25 @@
           verifyHytaleBlock();
         }
       });
+
+      let meshToCube = new Action('hytale_mesh_to_cube', {
+        name: 'Convert Meshes to Cubes',
+        description: 'Converts cuboid meshes to cubes while preserving UVs and properties',
+        icon: 'transform',
+        click() {
+          convertMeshesToCubes();
+        }
+      });
       
       MenuBar.addAction(entityItemVerify, 'tools');
       MenuBar.addAction(blockVerify, 'tools');
+      MenuBar.addAction(meshToCube, 'tools');
     },
     
     onunload() {
       entityItemVerify.delete();
       blockVerify.delete();
+      meshToCube.delete();
     }
   });
 
@@ -77,6 +88,180 @@
            (zUnique === 2 || zUnique === 1);
   }
 
+  function convertMeshesToCubes() {
+    let converted = 0;
+    let skipped = 0;
+    let meshesToConvert = [];
+
+    Mesh.all.forEach(mesh => {
+      if (!mesh.visibility) {
+        skipped++;
+        return;
+      }
+      
+      if (!isMeshCuboid(mesh)) {
+        skipped++;
+        return;
+      }
+      
+      meshesToConvert.push(mesh);
+    });
+    
+    if (meshesToConvert.length === 0) {
+      Blockbench.showQuickMessage('No cuboid meshes found to convert', 2000);
+      return;
+    }
+    
+    Undo.initEdit({elements: meshesToConvert});
+    
+    meshesToConvert.forEach(mesh => {
+      try {
+        let vertexArray = Object.values(mesh.vertices);
+        
+        let xVals = vertexArray.map(v => v[0]);
+        let yVals = vertexArray.map(v => v[1]);
+        let zVals = vertexArray.map(v => v[2]);
+
+        let minX = Math.min(...xVals);
+        let maxX = Math.max(...xVals);
+        let minY = Math.min(...yVals);
+        let maxY = Math.max(...yVals);
+        let minZ = Math.min(...zVals);
+        let maxZ = Math.max(...zVals);
+
+        let matrix = eulerXYZToMatrix(mesh.rotation[0], mesh.rotation[1], mesh.rotation[2]);
+        let cubeRotation = matrixToEulerZYX(matrix);
+        
+        let parent = mesh.parent;
+
+        let cube = new Cube({
+          name: mesh.name,
+          color: mesh.color,
+          origin: mesh.position.slice(),
+          rotation: cubeRotation,
+          visibility: mesh.visibility,
+          locked: mesh.locked,
+          export: mesh.export,
+          render_order: mesh.render_order,
+          allow_mirror_modeling: mesh.allow_mirror_modeling,
+          from: [
+            minX + mesh.position[0],
+            minY + mesh.position[1],
+            minZ + mesh.position[2]
+          ],
+          to: [
+            maxX + mesh.position[0],
+            maxY + mesh.position[1],
+            maxZ + mesh.position[2]
+          ]
+        }).init();
+        
+        if (mesh.faces) {
+          copyMeshFacesToCube(mesh, cube);
+        }
+        
+        if (parent === 'root') {
+          cube.addTo();
+        } else {
+          cube.addTo(parent);
+        }
+        
+        mesh.remove();
+        converted++;
+      } catch (e) {
+        skipped++;
+      }
+    });
+    
+    Undo.finishEdit('Convert meshes to cubes');
+    
+    Canvas.updateAll();
+    updateSelection();
+    
+    Blockbench.showQuickMessage('Converted all cuboid and plane meshes to cubes.', 3000);
+  }
+
+  function copyMeshFacesToCube(mesh, cube) {
+    // Map mesh faces to cube faces based on face normals
+    for (let faceKey in mesh.faces) {
+      let meshFace = mesh.faces[faceKey];
+      
+      if (!meshFace.vertices || meshFace.vertices.length === 0) continue;
+      
+      let faceVertices = meshFace.vertices.map(vKey => mesh.vertices[vKey]);
+      
+      let normal = calculateFaceNormal(faceVertices);
+      let cubeFaceKey = getCubeFaceFromNormal(normal);
+      
+      if (cubeFaceKey && cube.faces[cubeFaceKey]) {
+        let cubeFace = cube.faces[cubeFaceKey];
+        
+        if (meshFace.texture !== null && meshFace.texture !== undefined) {
+          cubeFace.texture = meshFace.texture;
+        }
+        
+        if (meshFace.uv) {
+          let uvCoords = meshFace.vertices.map(vKey => meshFace.uv[vKey]);
+          
+          if (uvCoords.length > 0 && uvCoords[0]) {
+            let minU = Math.min(...uvCoords.map(uv => uv[0]));
+            let maxU = Math.max(...uvCoords.map(uv => uv[0]));
+            let minV = Math.min(...uvCoords.map(uv => uv[1]));
+            let maxV = Math.max(...uvCoords.map(uv => uv[1]));
+            
+            cubeFace.uv = [minU, minV, maxU, maxV];
+          }
+        }
+      }
+    }
+  }
+
+  function calculateFaceNormal(vertices) {
+    if (vertices.length < 3) return [0, 0, 0];
+    
+    let v1 = vertices[0];
+    let v2 = vertices[1];
+    let v3 = vertices[2];
+    
+    let edge1 = [v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2]];
+    let edge2 = [v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2]];
+    
+    let normal = [
+      edge1[1] * edge2[2] - edge1[2] * edge2[1],
+      edge1[2] * edge2[0] - edge1[0] * edge2[2],
+      edge1[0] * edge2[1] - edge1[1] * edge2[0]
+    ];
+    
+    let length = Math.sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+    if (length > 0) {
+      normal = [normal[0] / length, normal[1] / length, normal[2] / length];
+    }
+    
+    return normal;
+  }
+
+  function getCubeFaceFromNormal(normal) {
+    let absX = Math.abs(normal[0]);
+    let absY = Math.abs(normal[1]);
+    let absZ = Math.abs(normal[2]);
+    
+    let maxAbs = Math.max(absX, absY, absZ);
+    
+    const threshold = 0.5;
+    
+    if (maxAbs < threshold) return null;
+    
+    if (absX === maxAbs) {
+      return normal[0] > 0 ? 'east' : 'west';
+    } else if (absY === maxAbs) {
+      return normal[1] > 0 ? 'up' : 'down';
+    } else if (absZ === maxAbs) {
+      return normal[2] > 0 ? 'south' : 'north';
+    }
+    
+    return null;
+  }
+
   function verifyModel(expectedDensity, modelType) {
     let issues = [];
     let meshIssues = {};
@@ -116,7 +301,6 @@
       }
     });
     
-    // Check cubes
     Cube.all.forEach(cube => {
       if (!cube.visibility) return;
       
@@ -154,7 +338,6 @@
       }
     });
     
-    // Check meshes  
     if (Mesh.all) {
       Mesh.all.forEach(mesh => {
         if (!mesh.visibility) return;
@@ -218,7 +401,6 @@
       });
     }
     
-    // Convert mesh issues to regular issues
     for (let meshName in meshIssues) {
       let meshIssue = meshIssues[meshName];
       let additionalText = meshIssue.count > 1 ? ` (+${meshIssue.count - 1} other face${meshIssue.count > 2 ? 's' : ''})` : '';
@@ -266,6 +448,41 @@
       case 'down':
         return { width: size[0], height: size[2] };
     }
+  }
+
+  function eulerXYZToMatrix(rx, ry, rz) {
+    rx = rx * Math.PI / 180;
+    ry = ry * Math.PI / 180;
+    rz = rz * Math.PI / 180;
+    
+    let cx = Math.cos(rx), sx = Math.sin(rx);
+    let cy = Math.cos(ry), sy = Math.sin(ry);
+    let cz = Math.cos(rz), sz = Math.sin(rz);
+    
+    return [
+      [cy*cz, -cy*sz, sy],
+      [cx*sz + sx*sy*cz, cx*cz - sx*sy*sz, -sx*cy],
+      [sx*sz - cx*sy*cz, sx*cz + cx*sy*sz, cx*cy]
+    ];
+  }
+
+  function matrixToEulerZYX(m) {
+    let y = Math.asin(-m[2][0]);
+    let x, z;
+    
+    if (Math.abs(m[2][0]) < 0.99999) {
+      x = Math.atan2(m[2][1], m[2][2]);
+      z = Math.atan2(m[1][0], m[0][0]);
+    } else {
+      x = Math.atan2(-m[1][2], m[1][1]);
+      z = 0;
+    }
+    
+    return [
+      x * 180 / Math.PI,
+      y * 180 / Math.PI,
+      z * 180 / Math.PI
+    ];
   }
 
 })();
