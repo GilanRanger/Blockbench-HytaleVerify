@@ -4,7 +4,7 @@
     title: 'Hytale Model Verifier',
     author: 'Gilan',
     description: 'Verifies whether a model has the correct resolution and shapes for the Hytale art-style and has tools for fixing these issues.',
-    about: 'This plugin includes tools for checking whether you only used Boxes, and will check the resolution for all used textures. It also contains a tool for converting Cuboid and Plane meshes to Cubes, and fixing UV scale.',
+    about: 'This plugin includes tools for checking whether you only used Boxes, and will check the resolution for all used textures. It also contains a tool for converting Cuboid and Plane meshes to Cubes, and fixing UV scale. This plugin is likely temporary until the Official Hytale plugin is released with many more features.',
     icon: 'verified',
     version: '1.3.0',
     min_version: '4.8.0',
@@ -320,9 +320,6 @@
             let pixelsNeededWidth = (faceSize.width / 16) * expectedDensity;
             let pixelsNeededHeight = (faceSize.height / 16) * expectedDensity;
             
-            console.log(pixelsNeededWidth);
-            console.log(pixelsNeededHeight);
-
             if (Math.abs(actualPixelsWidth - pixelsNeededWidth) >= 1 || Math.abs(actualPixelsHeight - pixelsNeededHeight) >= 1) {
               issues.push({
                 name: `${cube.name} (${faceKey} face)`,
