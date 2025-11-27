@@ -3,10 +3,13 @@
   Plugin.register('hytale_verifier', {
     title: 'Hytale Model Verifier',
     author: 'Gilan',
-    description: 'Verifies whether a model has the correct resolution for the Hytale art-style',
+    description: 'Verifies whether a model has the correct resolution and shapes for the Hytale art-style and has tools for fixing these issues.',
+    about: 'This plugin includes tools for checking whether you only used Boxes, and will check the resolution for all used textures. It also contains a tool for converting Cuboid and Plane meshes to Cubes, and fixing UV scale.',
     icon: 'verified',
-    version: '1.2.0',
+    version: '1.3.0',
+    min_version: '4.8.0',
     variant: 'both',
+    tags: ['Hytale'],
     
     onload() {
       let modelVerify = new Action('hytale_model_verify', {
@@ -280,34 +283,22 @@
       if (!element.visibility) return;
       
       if (element.type === 'mesh') {
-        if (!isMeshCuboid(element)) {
-          let vertexCount = element.vertices ? Object.keys(element.vertices).length : 0;
-          issues.push({
-            name: element.name,
-            resolution: `Invalid mesh shape (${vertexCount} vertices)`,
-            expected: 'Must be a cuboid or plane'
-          });
-        }
-      } else if (element.type !== 'cube') {
+        let vertexCount = element.vertices ? Object.keys(element.vertices).length : 0;
         issues.push({
           name: element.name,
-          resolution: `Invalid element type: ${element.type}`,
-          expected: 'Must be a cube or mesh cuboid/plane'
+          resolution: `Contains mesh with (${vertexCount} vertices)`,
+          expected: 'Models must only use Cubes'
         });
-        return;
       }
-      
-      if (element.type === 'cube') {
-        let size = [element.size(0), element.size(1), element.size(2)];
-        let zeroCount = size.filter(s => s === 0).length;
-        
-        if (zeroCount !== 0 && zeroCount !== 1) {
-          issues.push({
-            name: element.name,
-            resolution: `Invalid shape (dimensions: ${size[0].toFixed(2)}x${size[1].toFixed(2)}x${size[2].toFixed(2)})`,
-            expected: 'Must be a box or plane'
-          });
-        }
+    });
+
+    Texture.all.forEach(texture => {
+      if(texture.width != texture.uv_width || texture.height != texture.uv_height) {
+        issues.push({
+          name: texture.name,
+          resolution: `Texture UV scale does not match texture scale`,
+          expected: "Repair with 'Scale UV for Hytale Model tool'"
+        });
       }
     });
     
@@ -321,7 +312,7 @@
           if (texture) {
             let uvWidth = Math.abs(face.uv[2] - face.uv[0]);
             let uvHeight = Math.abs(face.uv[3] - face.uv[1]);
-                        
+
             let actualPixelsWidth = uvWidth;
             let actualPixelsHeight = uvHeight;
 
@@ -329,7 +320,10 @@
             let pixelsNeededWidth = (faceSize.width / 16) * expectedDensity;
             let pixelsNeededHeight = (faceSize.height / 16) * expectedDensity;
             
-            if (Math.abs(actualPixelsWidth - pixelsNeededWidth) > 1 || Math.abs(actualPixelsHeight - pixelsNeededHeight) > 1) {
+            console.log(pixelsNeededWidth);
+            console.log(pixelsNeededHeight);
+
+            if (Math.abs(actualPixelsWidth - pixelsNeededWidth) >= 1 || Math.abs(actualPixelsHeight - pixelsNeededHeight) >= 1) {
               issues.push({
                 name: `${cube.name} (${faceKey} face)`,
                 resolution: `${actualPixelsWidth.toFixed(1)}x${actualPixelsHeight.toFixed(1)} pixels (need ${pixelsNeededWidth.toFixed(1)}x${pixelsNeededHeight.toFixed(1)})`,
@@ -342,13 +336,13 @@
     });
     
     if (issues.length === 0) {
-      Blockbench.showQuickMessage(`${modelType} verified! All textures are correct density.`, 3000);
+      Blockbench.showQuickMessage(`${modelType} verified! All textures and UVs are correct density`, 3000);
     } else {
       const maxDisplay = 8;
       let displayIssues = issues.slice(0, maxDisplay);
       let remainingCount = issues.length - maxDisplay;
       
-      let message = `Found ${issues.length} issue(s) with ${modelType} model (expected 1:1 pixel density):\n\n`;
+      let message = `Found ${issues.length} issue(s) with ${modelType} model (repair errors in order):\n\n`;
       displayIssues.forEach(issue => {
         message += ` - ${issue.name}: ${issue.resolution} (Expected: ${issue.expected})\n`;
       });
