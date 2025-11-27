@@ -18,6 +18,8 @@ The plugin also includes a "Convert Meshes To Cubes" which will convert any cubo
 
 There is also a "Fix UV for Hytale Model" which will scale your UV to be the right size. Sometimes the model may be correct, but the UV values are decimals instead of integers; this will fix that.
 
+*Also a reminder that Blockbench includes a "Scale" tool that allows you to scale up the entire model at the same time. This is great if you accidentally made your model too small*
+
 ### Issues
 
 If you run into any issues, please report them.

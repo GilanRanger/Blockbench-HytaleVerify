@@ -368,9 +368,6 @@
       maxHeight = Math.max(maxHeight, texture.height);
     });
 
-    const projectUVWidth = Project.texture_width || 16
-    const projectUVHeight = Project.texture_height || 16
-
     // Start of undo point
     Undo.initEdit({
       cubes: Cube.all,
@@ -380,8 +377,8 @@
 
     // Scale UVs for each texture
     Texture.all.forEach(texture => {
-      const scaleX = texture.width / projectUVWidth;
-      const scaleY = texture.height / projectUVHeight;
+      const scaleX = texture.width / texture.uv_height;
+      const scaleY = texture.height / texture.uv_width;
 
       Cube.all.forEach(cube => {
         for (let faceKey in cube.faces) {
