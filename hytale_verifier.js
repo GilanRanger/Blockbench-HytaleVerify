@@ -19,11 +19,20 @@
       });
 
       let uvScale = new Action('hytale_fix_uv_scale', {
-        name: 'Fix UV for Hytale Model',
+        name: 'Scale UV for Hytale Model',
         description: 'Scales UV coordiantes to match the size of their texture',
         icon: 'photo_size_select_large',
         click() {
           fixUVScale();
+        }
+      });
+
+      let uvAttemptFix = new Action('hytale_uv_attempt_fix', {
+        name: 'Fix UV for Hytale Model',
+        description: 'Fixes the size of each per-face UV of a model to match the 1:1 ratio, will then require you either move the UV or change the texture to match',
+        icon: 'aspect_ratio',
+        click() {
+          attemptToFixUV(16);
         }
       });
 
@@ -36,12 +45,14 @@
         }
       });
       
+      MenuBar.addAction(uvAttemptFix, 'tools');
       MenuBar.addAction(uvScale, 'tools');
       MenuBar.addAction(modelVerify, 'tools');
       MenuBar.addAction(meshToCube, 'tools');
     },
     
     onunload() {
+      uvAttemptFix.delete();
       uvScale.delete();
       modelVerify.delete();
       meshToCube.delete();
@@ -264,7 +275,6 @@
 
   function verifyModel(expectedDensity, modelType) {
     let issues = [];
-    let meshIssues = {};
     
     Outliner.elements.forEach(element => {
       if (!element.visibility) return;
@@ -311,10 +321,7 @@
           if (texture) {
             let uvWidth = Math.abs(face.uv[2] - face.uv[0]);
             let uvHeight = Math.abs(face.uv[3] - face.uv[1]);
-            
-            let textureUVWidth = texture.uv_width || texture.width || 16;
-            let textureUVHeight = texture.uv_height || texture.height || 16;
-            
+                        
             let actualPixelsWidth = uvWidth;
             let actualPixelsHeight = uvHeight;
 
@@ -356,6 +363,55 @@
         icon: 'warning'
       });
     }
+  }
+
+  function attemptToFixUV(expectedDensity) {
+    Undo.initEdit({
+      cubes: Cube.all,
+      uv_mode: true
+    });
+
+    Cube.all.forEach(cube => {
+      if (!cube.visibility) return;
+      
+      for (let faceKey in cube.faces) {
+        let face = cube.faces[faceKey];
+        if (face.texture !== null && face.texture !== undefined) {
+          let texture = Texture.all.find(t => t.uuid === face.texture);
+          if (texture) {
+            let uvWidth = Math.abs(face.uv[2] - face.uv[0]);
+            let uvHeight = Math.abs(face.uv[3] - face.uv[1]);
+                        
+            let actualPixelsWidth = uvWidth;
+            let actualPixelsHeight = uvHeight;
+
+            let faceSize = getFaceSize(cube, faceKey);
+            let pixelsNeededWidth = (faceSize.width / 16) * expectedDensity;
+            let pixelsNeededHeight = (faceSize.height / 16) * expectedDensity;
+            
+            if (Math.abs(actualPixelsWidth - pixelsNeededWidth) > 1 || Math.abs(actualPixelsHeight - pixelsNeededHeight) > 1) {
+              let centerU = (face.uv[0] + face.uv[2]) / 2;
+              let centerV = (face.uv[1] + face.uv[3]) / 2;
+              
+              let scaleX = pixelsNeededWidth / actualPixelsWidth;
+              let scaleY = pixelsNeededHeight / actualPixelsHeight;
+
+              let halfWidth = (uvWidth * scaleX) / 2;
+              let halfHeight = (uvHeight * scaleY) / 2;
+
+              face.uv[0] = centerU - halfWidth;
+              face.uv[1] = centerV - halfHeight;
+              face.uv[2] = centerU + halfWidth;
+              face.uv[3] = centerV + halfHeight;
+            }
+          }
+        }
+      }
+    });
+
+    Undo.finishEdit('Fix UV scale to match density');
+    Canvas.updateAll();
+    Blockbench.showQuickMessage(`UVs scaled to correct pixel density! You will have to re-position them and possibly update your texture!`);
   }
 
   function fixUVScale() {
