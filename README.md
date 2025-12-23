@@ -2,7 +2,7 @@
 
 Verifies whether a model has the correct resolution for the Hytale art-style.
 
-**This plugin is likely temporary until the Official Hytale plugin is released with many more features.**
+**THIS PLUGIN IS NO LONGER UNDER DEVELOPMENT DUE TO THE OFFICIAL HYTALE PLUGIN RELEASING**
 
 ## Setup
 
